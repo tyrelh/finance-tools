@@ -47,6 +47,10 @@ type model struct {
 	copyNotice  string
 	runErr      error
 	fatalErr    error
+
+	authChecking bool
+	authOk       bool
+	authMessage  string
 }
 
 func initialModel() model {
@@ -67,21 +71,23 @@ func initialModel() model {
 	sp.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
 
 	return model{
-		screen:  pickerScreen,
-		list:    l,
-		spinner: sp,
+		screen:       pickerScreen,
+		list:         l,
+		spinner:      sp,
+		authChecking: true,
+		authMessage:  "Checking session…",
 	}
 }
 
 func (m model) Init() tea.Cmd {
-	return nil
+	return runAuthCheck()
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
-		m.list.SetSize(msg.Width, msg.Height-2)
+		m.list.SetSize(msg.Width, msg.Height-3)
 		if m.inv != nil && m.inv.Form != nil {
 			m.inv.Form = m.inv.Form.WithWidth(msg.Width).WithHeight(msg.Height - 2)
 		}
@@ -134,6 +140,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 
+	case authCheckMsg:
+		m.authChecking = false
+		m.authOk = msg.Ok
+		m.authMessage = msg.Message
+		return m, nil
+
 	case runFinishedMsg:
 		m.stderr = msg.Stderr
 		m.tsv = msg.Stdout
@@ -142,12 +154,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.screen = errorScreen
 			return m, nil
 		}
+		var followup tea.Cmd
+		if m.inv != nil && m.inv.ScriptFile == "ws_auth.py" {
+			m.authChecking = true
+			m.authMessage = "Checking session…"
+			followup = runAuthCheck()
+		}
 		columns := m.inv.Columns()
 		m.copyNotice = ""
 		if len(columns) == 0 {
 			m.table = table.Model{}
 			m.screen = outputScreen
-			return m, nil
+			return m, followup
 		}
 		rows, tableCols := parseTSV(msg.Stdout, columns)
 		t := table.New(
@@ -162,7 +180,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		t.SetStyles(ts)
 		m.table = t
 		m.screen = outputScreen
-		return m, nil
+		return m, followup
 	}
 
 	// Route to the active screen's component.
@@ -208,7 +226,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m model) View() string {
 	switch m.screen {
 	case pickerScreen:
-		return m.list.View()
+		return m.list.View() + "\n" + m.authStatusLine()
 
 	case formScreen:
 		return m.inv.Form.View()
@@ -266,6 +284,19 @@ func (m model) View() string {
 	}
 
 	return ""
+}
+
+func (m model) authStatusLine() string {
+	if m.authChecking {
+		return subtleStyle.Render("⋯ " + m.authMessage)
+	}
+	if m.authMessage == "" {
+		return ""
+	}
+	if m.authOk {
+		return successStyle.Render("✓ " + m.authMessage)
+	}
+	return errorStyle.Render("✗ " + m.authMessage)
 }
 
 func (m model) resetToPicker() model {

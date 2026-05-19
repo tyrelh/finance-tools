@@ -17,6 +17,34 @@ type runFinishedMsg struct {
 	Err    error
 }
 
+type authCheckMsg struct {
+	Ok      bool
+	Message string
+}
+
+func runAuthCheck() tea.Cmd {
+	return func() tea.Msg {
+		root, err := findRepoRoot()
+		if err != nil {
+			return authCheckMsg{Ok: false, Message: err.Error()}
+		}
+		cmd := exec.Command("uv", "run", "python", filepath.Join("scripts", "ws_auth.py"), "--check")
+		cmd.Dir = root
+		var stdout, stderr bytes.Buffer
+		cmd.Stdout = &stdout
+		cmd.Stderr = &stderr
+		runErr := cmd.Run()
+		message := strings.TrimSpace(stdout.String())
+		if message == "" {
+			message = strings.TrimSpace(stderr.String())
+		}
+		if message == "" && runErr != nil {
+			message = runErr.Error()
+		}
+		return authCheckMsg{Ok: runErr == nil, Message: message}
+	}
+}
+
 func findRepoRoot() (string, error) {
 	dir, err := os.Getwd()
 	if err != nil {
