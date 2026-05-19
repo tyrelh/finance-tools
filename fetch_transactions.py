@@ -139,7 +139,8 @@ def main() -> int:
     columns = ["date", "description", "amount"]
     if args.all_columns:
         columns += ["currency", "type", "subType"]
-    print("\t".join(columns))
+    if sys.stdout.isatty():
+        print("\t".join(columns))
 
     for act in activities:
         row = {
