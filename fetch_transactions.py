@@ -69,6 +69,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--since", type=datetime.fromisoformat, help="Start date YYYY-MM-DD (default: first day of previous month)")
     p.add_argument("--until", type=datetime.fromisoformat, help="End date YYYY-MM-DD (default: last day of previous month)")
     p.add_argument("--list-accounts", action="store_true", help="Print all accounts and exit")
+    p.add_argument("--all-transactions", action="store_true", help="Include non-PURCHASE activities and pending transactions")
     p.add_argument("--logout", action="store_true", help="Clear saved session from keychain")
     return p.parse_args()
 
@@ -119,6 +120,12 @@ def main() -> int:
         order_by="OCCURRED_AT_ASC",
         load_all=True,
     )
+
+    if not args.all_transactions:
+        activities = [
+            a for a in activities
+            if a.get("subType") == "PURCHASE" and a.get("status") != "authorized"
+        ]
 
     print("date\tdescription\tamount\tcurrency\ttype\tsubType")
     for act in activities:
