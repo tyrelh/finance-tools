@@ -143,6 +143,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		columns := m.inv.Columns()
+		m.copyNotice = ""
+		if len(columns) == 0 {
+			m.table = table.Model{}
+			m.screen = outputScreen
+			return m, nil
+		}
 		rows, tableCols := parseTSV(msg.Stdout, columns)
 		t := table.New(
 			table.WithColumns(tableCols),
@@ -155,7 +161,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		ts.Selected = ts.Selected.Foreground(lipgloss.Color("229")).Background(lipgloss.Color("57")).Bold(false)
 		t.SetStyles(ts)
 		m.table = t
-		m.copyNotice = ""
 		m.screen = outputScreen
 		return m, nil
 	}
@@ -175,8 +180,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch m.inv.Form.State {
 		case huh.StateCompleted:
 			args := m.inv.BuildArgs()
+			var stdin string
+			if m.inv.Stdin != nil {
+				stdin = m.inv.Stdin()
+			}
 			m.screen = runningScreen
-			return m, tea.Batch(m.spinner.Tick, runScript(m.inv.ScriptFile, args))
+			return m, tea.Batch(m.spinner.Tick, runScript(m.inv.ScriptFile, args, stdin))
 		case huh.StateAborted:
 			return m.resetToPicker(), nil
 		}
@@ -213,20 +222,29 @@ func (m model) View() string {
 		var b strings.Builder
 		b.WriteString(titleStyle.Render(fmt.Sprintf(" %s ", m.inv.ScriptFile)))
 		b.WriteString("\n")
-		b.WriteString(tableBorderStyle.Render(m.table.View()))
-		b.WriteString("\n")
-		rowCount := len(m.table.Rows())
-		b.WriteString(subtleStyle.Render(fmt.Sprintf("%d row(s)", rowCount)))
-		if m.copyNotice != "" {
-			b.WriteString("   ")
-			b.WriteString(m.copyNotice)
+		hasTable := len(m.inv.Columns()) > 0
+		if hasTable {
+			b.WriteString(tableBorderStyle.Render(m.table.View()))
+			b.WriteString("\n")
+			rowCount := len(m.table.Rows())
+			b.WriteString(subtleStyle.Render(fmt.Sprintf("%d row(s)", rowCount)))
+			if m.copyNotice != "" {
+				b.WriteString("   ")
+				b.WriteString(m.copyNotice)
+			}
+		} else if out := strings.TrimSpace(m.tsv); out != "" {
+			b.WriteString(out)
 		}
 		if m.stderr != "" {
 			b.WriteString("\n")
 			b.WriteString(stderrStyle.Render(strings.TrimSpace(m.stderr)))
 		}
 		b.WriteString("\n")
-		b.WriteString(footerStyle.Render("↑/↓ navigate · c copy TSV · esc back · q quit"))
+		if hasTable {
+			b.WriteString(footerStyle.Render("↑/↓ navigate · c copy TSV · esc back · q quit"))
+		} else {
+			b.WriteString(footerStyle.Render("esc back · q quit"))
+		}
 		return b.String()
 
 	case errorScreen:

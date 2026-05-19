@@ -1,12 +1,19 @@
 """Wealthsimple authentication: keychain-backed session storage and interactive login."""
 
 import argparse
+import json
 import sys
 from getpass import getpass
 
 import keyring
 from ws_api import WealthsimpleAPI
-from ws_api.exceptions import CurlException, ManualLoginRequired, OTPRequiredException, WSApiException
+from ws_api.exceptions import (
+    CurlException,
+    LoginFailedException,
+    ManualLoginRequired,
+    OTPRequiredException,
+    WSApiException,
+)
 from ws_api.session import WSAPISession
 
 KEYRING_SERVICE = "wealthsimple-finances"
@@ -64,6 +71,30 @@ def load_or_login() -> tuple[WSAPISession, str]:
     return interactive_login()
 
 
+def stdin_login() -> tuple[WSAPISession, str]:
+    """Log in non-interactively using JSON credentials from stdin.
+
+    Expects {"email": "...", "password": "...", "otp": "..."} on stdin.
+    The otp field is optional; if absent or empty and 2FA is required, raises.
+    """
+    try:
+        creds = json.loads(sys.stdin.read())
+    except json.JSONDecodeError as e:
+        raise SystemExit(f"Invalid JSON on stdin: {e}")
+    email = (creds.get("email") or "").strip()
+    password = creds.get("password") or ""
+    otp = (creds.get("otp") or "").strip() or None
+    if not email or not password:
+        raise SystemExit("stdin JSON must include non-empty 'email' and 'password'.")
+    session = WealthsimpleAPI.login(
+        username=email,
+        password=password,
+        otp_answer=otp,
+        persist_session_fct=persist_session,
+    )
+    return session, email
+
+
 def check_session() -> tuple[bool, str]:
     """Hit the API to confirm the saved session is active. Returns (ok, message).
 
@@ -90,6 +121,7 @@ def parse_args() -> argparse.Namespace:
     g.add_argument("--logout", action="store_true", help="Clear saved session from keychain")
     g.add_argument("--status", action="store_true", help="Show whether a session is saved (no network call)")
     g.add_argument("--check", action="store_true", help="Hit the API to confirm the saved session is still active")
+    g.add_argument("--from-stdin", action="store_true", help="Read {email,password,otp} JSON from stdin and log in non-interactively (overwrites any saved session)")
     return p.parse_args()
 
 
@@ -114,6 +146,18 @@ def main() -> int:
         ok, message = check_session()
         print(message)
         return 0 if ok else 1
+
+    if args.from_stdin:
+        try:
+            _, username = stdin_login()
+        except OTPRequiredException:
+            print("2FA code required but none provided.", file=sys.stderr)
+            return 1
+        except LoginFailedException as e:
+            print(f"Login failed: {e}", file=sys.stderr)
+            return 1
+        print(f"Logged in as {username}.", file=sys.stderr)
+        return 0
 
     if load_session() is not None:
         print("Session already saved. Use --logout to clear it first.", file=sys.stderr)

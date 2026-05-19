@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -33,7 +34,7 @@ func findRepoRoot() (string, error) {
 	}
 }
 
-func runScript(scriptFile string, args []string) tea.Cmd {
+func runScript(scriptFile string, args []string, stdin string) tea.Cmd {
 	return func() tea.Msg {
 		root, err := findRepoRoot()
 		if err != nil {
@@ -47,6 +48,9 @@ func runScript(scriptFile string, args []string) tea.Cmd {
 		var stdout, stderr bytes.Buffer
 		cmd.Stdout = &stdout
 		cmd.Stderr = &stderr
+		if stdin != "" {
+			cmd.Stdin = strings.NewReader(stdin)
+		}
 
 		runErr := cmd.Run()
 		return runFinishedMsg{

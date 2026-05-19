@@ -1,6 +1,8 @@
 package main
 
 import (
+	"encoding/json"
+	"strings"
 	"time"
 
 	"github.com/charmbracelet/huh"
@@ -16,11 +18,15 @@ type Script struct {
 
 // Invocation is a single configured run of a script: its form, the args it
 // will produce when the form completes, and the columns its TSV output uses.
+// Stdin is optional; when nil or returning "", the child process gets no stdin.
+// When Columns returns an empty slice, the runner renders stderr/stdout as
+// text instead of a table.
 type Invocation struct {
 	Form       *huh.Form
 	ScriptFile string
 	BuildArgs  func() []string
 	Columns    func() []string
+	Stdin      func() string
 }
 
 // Registry of available scripts. Add new entries here as the project grows.
@@ -30,6 +36,12 @@ var registry = []Script{
 		Name:        "Fetch transactions",
 		Description: "Pull Wealthsimple credit card transactions as TSV",
 		New:         newFetchTransactions,
+	},
+	{
+		ID:          "ws_auth",
+		Name:        "Log in to Wealthsimple",
+		Description: "Authenticate and save a session to the macOS keychain",
+		New:         newLogin,
 	},
 }
 
@@ -114,3 +126,61 @@ func validateOptionalDate(s string) error {
 	_, err := time.Parse("2006-01-02", s)
 	return err
 }
+
+func newLogin() *Invocation {
+	state := struct {
+		Email    string
+		Password string
+		OTP      string
+	}{}
+
+	required := func(label string) func(string) error {
+		return func(s string) error {
+			if strings.TrimSpace(s) == "" {
+				return errEmptyField(label)
+			}
+			return nil
+		}
+	}
+
+	form := huh.NewForm(
+		huh.NewGroup(
+			huh.NewNote().
+				Title("Log in to Wealthsimple").
+				Description("Credentials are piped to the script via stdin and never written to disk. Only the session token is persisted (macOS keychain)."),
+			huh.NewInput().
+				Title("Email").
+				Value(&state.Email).
+				Validate(required("email")),
+			huh.NewInput().
+				Title("Password").
+				EchoMode(huh.EchoModePassword).
+				Value(&state.Password).
+				Validate(required("password")),
+			huh.NewInput().
+				Title("2FA code").
+				Placeholder("6-digit TOTP from your authenticator").
+				Value(&state.OTP).
+				Validate(required("2FA code")),
+		),
+	)
+
+	return &Invocation{
+		Form:       form,
+		ScriptFile: "ws_auth.py",
+		BuildArgs:  func() []string { return []string{"--from-stdin"} },
+		Columns:    func() []string { return nil },
+		Stdin: func() string {
+			payload, _ := json.Marshal(map[string]string{
+				"email":    strings.TrimSpace(state.Email),
+				"password": state.Password,
+				"otp":      strings.TrimSpace(state.OTP),
+			})
+			return string(payload)
+		},
+	}
+}
+
+type errEmptyField string
+
+func (e errEmptyField) Error() string { return string(e) + " is required" }
