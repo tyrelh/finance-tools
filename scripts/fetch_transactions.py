@@ -3,58 +3,10 @@
 import argparse
 import sys
 from datetime import datetime, timedelta
-from getpass import getpass
 
-import keyring
 from ws_api import WealthsimpleAPI
-from ws_api.exceptions import OTPRequiredException
-from ws_api.session import WSAPISession
 
-KEYRING_SERVICE = "wealthsimple-finances"
-SESSION_KEY = "session"
-USERNAME_KEY = "username"
-
-
-def persist_session(session_json: str, username: str) -> None:
-    keyring.set_password(KEYRING_SERVICE, USERNAME_KEY, username)
-    keyring.set_password(KEYRING_SERVICE, SESSION_KEY, session_json)
-
-
-def load_session() -> tuple[WSAPISession, str] | None:
-    username = keyring.get_password(KEYRING_SERVICE, USERNAME_KEY)
-    session_json = keyring.get_password(KEYRING_SERVICE, SESSION_KEY)
-    if not username or not session_json:
-        return None
-    return WSAPISession.from_json(session_json), username
-
-
-def clear_session() -> None:
-    for key in (USERNAME_KEY, SESSION_KEY):
-        try:
-            keyring.delete_password(KEYRING_SERVICE, key)
-        except keyring.errors.PasswordDeleteError:
-            pass
-
-
-def interactive_login() -> tuple[WSAPISession, str]:
-    print("Logging in to Wealthsimple. Only the session token is stored (in macOS keychain).", file=sys.stderr)
-    username = input("Email: ").strip()
-    password = getpass("Password: ")
-    try:
-        session = WealthsimpleAPI.login(
-            username=username,
-            password=password,
-            persist_session_fct=persist_session,
-        )
-    except OTPRequiredException:
-        otp = input("2FA code: ").strip()
-        session = WealthsimpleAPI.login(
-            username=username,
-            password=password,
-            otp_answer=otp,
-            persist_session_fct=persist_session,
-        )
-    return session, username
+from ws_auth import clear_session, load_or_login, persist_session
 
 
 def previous_calendar_month(today: datetime) -> tuple[datetime, datetime]:
@@ -95,12 +47,7 @@ def main() -> int:
         print("Session cleared.", file=sys.stderr)
         return 0
 
-    stored = load_session()
-    if stored is None:
-        session, username = interactive_login()
-    else:
-        session, username = stored
-
+    session, username = load_or_login()
     ws = WealthsimpleAPI.from_token(session, persist_session, username)
     accounts = ws.get_accounts()
 
