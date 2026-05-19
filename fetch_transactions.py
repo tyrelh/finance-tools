@@ -116,6 +116,7 @@ def main() -> int:
         account_id=[a["id"] for a in cc_accounts],
         start_date=start,
         end_date=end,
+        order_by="OCCURRED_AT_ASC",
         load_all=True,
     )
 
