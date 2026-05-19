@@ -15,10 +15,17 @@ uv sync
 uv run python fetch_transactions.py --list-accounts
 
 # Fetch previous calendar month's credit card transactions as TSV
+# (default: settled purchases only; columns: date, description, amount)
 uv run python fetch_transactions.py
 
 # Custom date range
 uv run python fetch_transactions.py --since 2026-04-01 --until 2026-04-30
+
+# Include payments, refunds, and pending transactions
+uv run python fetch_transactions.py --all-transactions
+
+# Add currency, type, and subType columns
+uv run python fetch_transactions.py --all-columns
 
 # Pipe straight to clipboard for pasting into Google Sheets
 uv run python fetch_transactions.py | pbcopy

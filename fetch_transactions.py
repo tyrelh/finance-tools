@@ -70,6 +70,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--until", type=datetime.fromisoformat, help="End date YYYY-MM-DD (default: last day of previous month)")
     p.add_argument("--list-accounts", action="store_true", help="Print all accounts and exit")
     p.add_argument("--all-transactions", action="store_true", help="Include non-PURCHASE activities and pending transactions")
+    p.add_argument("--all-columns", action="store_true", help="Include currency, type, and subType columns")
     p.add_argument("--logout", action="store_true", help="Clear saved session from keychain")
     return p.parse_args()
 
@@ -127,17 +128,21 @@ def main() -> int:
             if a.get("subType") == "PURCHASE" and a.get("status") != "authorized"
         ]
 
-    print("date\tdescription\tamount\tcurrency\ttype\tsubType")
+    columns = ["date", "description", "amount"]
+    if args.all_columns:
+        columns += ["currency", "type", "subType"]
+    print("\t".join(columns))
+
     for act in activities:
-        occurred = act.get("occurredAt") or ""
-        print("\t".join([
-            occurred[:10],
-            tsv_safe(act.get("description")),
-            tsv_safe(act.get("amount")),
-            tsv_safe(act.get("currency")),
-            tsv_safe(act.get("type")),
-            tsv_safe(act.get("subType")),
-        ]))
+        row = {
+            "date": (act.get("occurredAt") or "")[:10],
+            "description": tsv_safe(act.get("description")),
+            "amount": tsv_safe(act.get("amount")),
+            "currency": tsv_safe(act.get("currency")),
+            "type": tsv_safe(act.get("type")),
+            "subType": tsv_safe(act.get("subType")),
+        }
+        print("\t".join(row[c] for c in columns))
 
     print(f"Returned {len(activities)} activities.", file=sys.stderr)
     return 0
