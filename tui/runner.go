@@ -46,17 +46,29 @@ func runAuthCheck() tea.Cmd {
 }
 
 func findRepoRoot() (string, error) {
-	dir, err := os.Getwd()
-	if err != nil {
-		return "", err
+	if dir, err := os.Getwd(); err == nil {
+		if root := walkUpForPyproject(dir); root != "" {
+			return root, nil
+		}
 	}
+	if exe, err := os.Executable(); err == nil {
+		if resolved, err := filepath.EvalSymlinks(exe); err == nil {
+			if root := walkUpForPyproject(filepath.Dir(resolved)); root != "" {
+				return root, nil
+			}
+		}
+	}
+	return "", errors.New("could not locate repo root (no pyproject.toml found above CWD or binary)")
+}
+
+func walkUpForPyproject(dir string) string {
 	for {
 		if _, err := os.Stat(filepath.Join(dir, "pyproject.toml")); err == nil {
-			return dir, nil
+			return dir
 		}
 		parent := filepath.Dir(dir)
 		if parent == dir {
-			return "", errors.New("could not locate repo root (no pyproject.toml found in any parent directory)")
+			return ""
 		}
 		dir = parent
 	}

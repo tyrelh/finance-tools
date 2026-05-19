@@ -23,6 +23,17 @@ cd tui && go run .
 
 Pick a script, fill in the form, see results in a scrollable table with copy-to-clipboard. On startup the picker shows a session status line (`✓` green if valid, `✗` red if expired/missing) — so you'll know up front whether you need to re-authenticate. If you do, pick **Log in to Wealthsimple** from the menu.
 
+### Install as `ws`
+
+To invoke the TUI from anywhere as `ws`, build the binary and symlink it into a directory on your `PATH`:
+
+```bash
+cd tui && go build -o wsf .
+ln -s "$PWD/wsf" ~/.local/bin/ws
+```
+
+Substitute `~/.local/bin` for whichever PATH directory you prefer (`~/bin`, `/usr/local/bin`, …). Re-run `go build` after Go changes; the symlink keeps pointing at the same path.
+
 ## Scripts
 
 ### `scripts/ws_auth.py`
