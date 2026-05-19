@@ -46,19 +46,25 @@ var registry = []Script{
 }
 
 func newFetchTransactions() *Invocation {
+	now := time.Now()
+	firstOfMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
+
 	state := struct {
 		Since           string
 		Until           string
 		ListAccounts    bool
 		AllTransactions bool
 		AllColumns      bool
-	}{}
+	}{
+		Since: firstOfMonth.Format("2006-01-02"),
+		Until: now.Format("2006-01-02"),
+	}
 
 	form := huh.NewForm(
 		huh.NewGroup(
 			huh.NewNote().
 				Title("Fetch transactions").
-				Description("Leave dates blank to default to the previous calendar month."),
+				Description("Defaults to the current month so far. Clear a date to fall back to the script's previous-calendar-month default."),
 			huh.NewInput().
 				Title("Since (YYYY-MM-DD)").
 				Placeholder("blank = first day of previous month").
