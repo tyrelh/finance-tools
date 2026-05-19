@@ -1,0 +1,9 @@
+[project]
+name = "wealthsimple-finances"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.10"
+dependencies = [
+    "keyring>=25.7.0",
+    "ws-api>=0.22.0",
+]
