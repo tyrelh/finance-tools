@@ -79,6 +79,14 @@ def tsv_safe(value) -> str:
     return str(value or "").replace("\t", " ").replace("\n", " ").replace("\r", " ")
 
 
+def describe(act: dict) -> str:
+    merchant = act.get("spendMerchant")
+    if merchant:
+        prefix = "(Pending) " if act.get("status") == "authorized" else ""
+        return f"{prefix}{merchant}"
+    return act.get("description") or ""
+
+
 def main() -> int:
     args = parse_args()
 
@@ -136,7 +144,7 @@ def main() -> int:
     for act in activities:
         row = {
             "date": (act.get("occurredAt") or "")[:10],
-            "description": tsv_safe(act.get("description")),
+            "description": tsv_safe(describe(act)),
             "amount": tsv_safe(act.get("amount")),
             "currency": tsv_safe(act.get("currency")),
             "type": tsv_safe(act.get("type")),
