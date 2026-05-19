@@ -20,7 +20,6 @@ def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--since", type=datetime.fromisoformat, help="Start date YYYY-MM-DD (default: first day of previous month)")
     p.add_argument("--until", type=datetime.fromisoformat, help="End date YYYY-MM-DD (default: last day of previous month)")
-    p.add_argument("--list-accounts", action="store_true", help="Print all accounts and exit")
     p.add_argument("--all-transactions", action="store_true", help="Include non-PURCHASE activities and pending transactions")
     p.add_argument("--all-columns", action="store_true", help="Include currency, type, and subType columns")
     p.add_argument("--logout", action="store_true", help="Clear saved session from keychain")
@@ -51,15 +50,9 @@ def main() -> int:
     ws = WealthsimpleAPI.from_token(session, persist_session, username)
     accounts = ws.get_accounts()
 
-    if args.list_accounts:
-        print("id\tunifiedAccountType\tdescription\tcurrency")
-        for a in accounts:
-            print("\t".join(tsv_safe(a.get(k)) for k in ("id", "unifiedAccountType", "description", "currency")))
-        return 0
-
     cc_accounts = [a for a in accounts if "CREDIT" in (a.get("unifiedAccountType") or "").upper()]
     if not cc_accounts:
-        print("No credit card accounts found. Run with --list-accounts to inspect.", file=sys.stderr)
+        print("No credit card accounts found.", file=sys.stderr)
         return 1
 
     print(f"Found {len(cc_accounts)} credit card account(s):", file=sys.stderr)

@@ -52,7 +52,6 @@ func newFetchTransactions() *Invocation {
 	state := struct {
 		Since           string
 		Until           string
-		ListAccounts    bool
 		AllTransactions bool
 		AllColumns      bool
 	}{
@@ -76,10 +75,6 @@ func newFetchTransactions() *Invocation {
 				Value(&state.Until).
 				Validate(validateOptionalDate),
 			huh.NewConfirm().
-				Title("List accounts instead of transactions?").
-				Description("Useful for discovering account IDs and types.").
-				Value(&state.ListAccounts),
-			huh.NewConfirm().
 				Title("Include non-purchases & pending?").
 				Description("Adds payments, refunds, and pending authorizations.").
 				Value(&state.AllTransactions),
@@ -94,9 +89,6 @@ func newFetchTransactions() *Invocation {
 		Form:       form,
 		ScriptFile: "fetch_transactions.py",
 		BuildArgs: func() []string {
-			if state.ListAccounts {
-				return []string{"--list-accounts"}
-			}
 			var args []string
 			if state.Since != "" {
 				args = append(args, "--since", state.Since)
@@ -113,9 +105,6 @@ func newFetchTransactions() *Invocation {
 			return args
 		},
 		Columns: func() []string {
-			if state.ListAccounts {
-				return []string{"id", "unifiedAccountType", "description", "currency"}
-			}
 			cols := []string{"date", "description", "amount"}
 			if state.AllColumns {
 				cols = append(cols, "currency", "type", "subType")

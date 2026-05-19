@@ -53,9 +53,6 @@ The module is also importable from other scripts in `scripts/` (`load_or_login`,
 ### `scripts/fetch_transactions.py`
 
 ```bash
-# Inspect your accounts (run this first to find the credit card)
-uv run python scripts/fetch_transactions.py --list-accounts
-
 # Fetch previous calendar month's credit card transactions as TSV
 # (default: settled purchases only; columns: date, description, amount)
 uv run python scripts/fetch_transactions.py
